@@ -101,10 +101,7 @@ if __name__ == "__main__":
         thread_id=thread.id,
         assistant_id=assistant.id
     )
-
-    # Wait 5 seconds for the run to complete
-    # time.sleep(10)
-
+    
     # Use a while loop to check if the run is completed
     while True:
         retrieved_run = client.beta.threads.runs.retrieve(
