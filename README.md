@@ -22,10 +22,7 @@ Before you start using this application, you need to ensure you have the followi
 ## Installation and configuration
 
 1. Clone or download the repository to your local machine.
-2. Install the required Python libraries:
-   ```bash
-   pip install fastapi uvicorn openai python-multipart
-   ```
+2. Pip install the required Python libraries:
 3. Create an OpenAI account and get your API key from [here](https://beta.openai.com/).
 4. See assistant_funcs and run the create_assistant function to create your assistant.
 5. Visit openai and find your assistant ID or get it from the response of the create_assistant function.
