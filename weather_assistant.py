@@ -1,92 +1,13 @@
 from openai import OpenAI
 import os
-import openmeteo_requests
-import requests_cache
-import pandas as pd
-from retry_requests import retry
 import json
 import time
 import argparse
 from dotenv import load_dotenv
-
-def get_weather_by_location(latitude, longitude, weather_variable="temperature_2m"):
-    # Setup the Open-Meteo API client with cache and retry on error
-    cache_session = requests_cache.CachedSession('.cache', expire_after=3600)
-    retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
-    openmeteo = openmeteo_requests.Client(session=retry_session)
-
-    # Prepare the API call
-    url = "https://api.open-meteo.com/v1/forecast"
-    params = {
-        "latitude": latitude,
-        "longitude": longitude,
-        "hourly": weather_variable
-    }
-
-    # Call the API
-    responses = openmeteo.weather_api(url, params=params)
-
-    # Process the first location response
-    response = responses[0]
-
-    # Process hourly data
-    hourly = response.Hourly()
-    hourly_data_values = hourly.Variables(0).ValuesAsNumpy()
-
-    hourly_data = {
-        "date": pd.date_range(
-            start=pd.to_datetime(hourly.Time(), unit="s"),
-            end=pd.to_datetime(hourly.TimeEnd(), unit="s"),
-            freq=pd.Timedelta(seconds=hourly.Interval()),
-            inclusive="left"
-        )
-    }
-    hourly_data[weather_variable] = hourly_data_values
-
-    return pd.DataFrame(data=hourly_data)
-
-def get_daily_weather_by_location(latitude, longitude, weather_variable=["weather_code", "temperature_2m_max", "temperature_2m_min"]):
-    # Setup the Open-Meteo API client with cache and retry on error
-    cache_session = requests_cache.CachedSession('.cache', expire_after = 3600)
-    retry_session = retry(cache_session, retries = 5, backoff_factor = 0.2)
-    openmeteo = openmeteo_requests.Client(session = retry_session)
-
-    # Make sure all required weather variables are listed here
-    # The order of variables in hourly or daily is important to assign them correctly below
-    url = "https://api.open-meteo.com/v1/forecast"
-    params = {
-        "latitude": latitude,
-        "longitude": longitude,
-        "daily": weather_variable
-    }
-    responses = openmeteo.weather_api(url, params=params)
-
-    # Process first location. Add a for-loop for multiple locations or weather models
-    response = responses[0]
-
-    # Process daily data. The order of variables needs to be the same as requested.
-    daily = response.Daily()
-    daily_weather_code = daily.Variables(0).ValuesAsNumpy()
-    daily_temperature_2m_max = daily.Variables(1).ValuesAsNumpy()
-    daily_temperature_2m_min = daily.Variables(2).ValuesAsNumpy()
-
-    daily_data = {"date": pd.date_range(
-        start = pd.to_datetime(daily.Time(), unit = "s"),
-        end = pd.to_datetime(daily.TimeEnd(), unit = "s"),
-        freq = pd.Timedelta(seconds = daily.Interval()),
-        inclusive = "left"
-    )}
-    daily_data["weather_code"] = daily_weather_code
-    daily_data["temperature_2m_max"] = daily_temperature_2m_max
-    daily_data["temperature_2m_min"] = daily_temperature_2m_min
-
-    return pd.DataFrame(data = daily_data)
+from assistant_funcs import get_weather_by_location, get_daily_weather_by_location
 
 
-if __name__ == "__main__":
-    load_dotenv()
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
+def create_assistant():
     assistant = client.beta.assistants.create(
         name="Weather Assistant",
         instructions='''You are a friendly assistant that tells me the weather in a location:
@@ -149,15 +70,10 @@ if __name__ == "__main__":
         ],
         model="gpt-4-1106-preview"
     )
+    return assistant
 
-     # Create an argument parser
-    parser = argparse.ArgumentParser(description="Weather Assistant CLI")
-    parser.add_argument("message", type=str, help="Your message to the Weather Assistant")
-    args = parser.parse_args()
-
-    # Use the provided message
-    user_message = args.message
-
+async def ask_assistant(client, assistant_id, user_message):
+    
     thread = client.beta.threads.create()
 
     message = client.beta.threads.messages.create(
@@ -175,7 +91,7 @@ if __name__ == "__main__":
 
     run = client.beta.threads.runs.create(
         thread_id=thread.id,
-        assistant_id=assistant.id
+        assistant_id=assistant_id,
     )
 
     # Use a while loop to check if the run is completed
@@ -184,6 +100,9 @@ if __name__ == "__main__":
             thread_id=thread.id,
             run_id=run.id,
         )
+
+        if retrieved_run.status == "completed":
+            break
 
         if retrieved_run and retrieved_run.required_action and retrieved_run.required_action.submit_tool_outputs:
             tool_call = retrieved_run.required_action.submit_tool_outputs.tool_calls[0]
@@ -213,30 +132,17 @@ if __name__ == "__main__":
             weather_data_json = weather_data.to_json(orient="records")
             # convert json to one string:
             weather_data_json = "".join(weather_data_json.splitlines())
-            break
-
-        time.sleep(1)
-
-    # Create a new message to the assistant with the weather data and ask for a concise summary
-    run = client.beta.threads.runs.submit_tool_outputs(
-            thread_id=thread.id,
-            run_id=run.id,
-            tool_outputs=[
-                {
-                "tool_call_id": tool_call.id,
-                "output": weather_data_json + "\n\nPlease summarize the weather in one or two sentences."
-                }
-            ]
-        )
-    
-    while True:
-        retrieved_run = client.beta.threads.runs.retrieve(
-            thread_id=thread.id,
-            run_id=run.id,
-        )
-
-        if retrieved_run.status == "completed":
-            break
+              # Create a new message to the assistant with the weather data and ask for a concise summary
+            run = client.beta.threads.runs.submit_tool_outputs(
+                    thread_id=thread.id,
+                    run_id=run.id,
+                    tool_outputs=[
+                        {
+                        "tool_call_id": tool_call.id,
+                        "output": weather_data_json + "\n\nPlease summarize the weather in one or two sentences."
+                        }
+                    ]
+                )
 
         time.sleep(1)
 
@@ -250,11 +156,29 @@ if __name__ == "__main__":
         for content_item in thread_message.content:
             print_messages.append(content_item.text.value + "\n")
 
-    for message in reversed(print_messages):
-        print(message)
+    return print_messages[0]
 
 
+
+
+if __name__ == "__main__":
+    load_dotenv()
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    # Create an assistant
+    assistant_id = os.getenv("ASSISTANT_ID")
+    if not assistant_id:
+        assistant = create_assistant()
+        assistant_id = assistant.id
+
+    # Create an argument parser
+    parser = argparse.ArgumentParser(description="Weather Assistant CLI")
+    parser.add_argument("message", type=str, help="Your message to the Weather Assistant")
+    args = parser.parse_args()
+
+    # Use the provided message
+    user_message = args.message
+
+    # Ask the assistant
+    ask_assistant(user_message)
     
-    # TODO: Add a continuous conversation loop
-
-
