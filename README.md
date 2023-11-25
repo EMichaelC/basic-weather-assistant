@@ -9,12 +9,17 @@ This Weather Assistant Application is a web-based interface that interacts with 
 Before you start using this application, you need to ensure you have the following:
 
 - Python 3.7 or higher
-- FastAPI
-- Uvicorn (for running the FastAPI app)
-- OpenAI Python client
+- `fastapi`: A modern, fast (high-performance), web framework for building APIs with Python 3.6+ based on standard Python type hints.
+- `uvicorn`: A lightning-fast ASGI server implementation, using uvloop and httptools.
+- `openai-python`: The official Python client for the OpenAI API.
 - `python-multipart` (for form handling in FastAPI)
+- `pandas`: Used for data manipulation and analysis.
+- `requests_cache`: Enables caching for API requests to improve performance and reduce the load on the API server.
+- `retry_requests`: Adds retry functionality to requests, useful for handling transient network issues.
+- `openmeteo_requests`: A custom client for accessing the Open-Meteo API.
+- `python-dotenv`: Reads key-value pairs from a .env file and can set them as environment variables.
 
-## Installation
+## Installation and configuration
 
 1. Clone or download the repository to your local machine.
 2. Install the required Python libraries:
@@ -22,15 +27,9 @@ Before you start using this application, you need to ensure you have the followi
    pip install fastapi uvicorn openai python-multipart
    ```
 3. Create an OpenAI account and get your API key from [here](https://beta.openai.com/).
-
-## Configuration
-
-To use the application, you need to set up a few environment variables:
-
-- `OPENAI_API_KEY`: Your OpenAI API key. This is required to authenticate requests to the OpenAI API.
-- `ASSISTANT_ID`: The ID of your OpenAI Assistant. This is specific to the assistant you have created in the OpenAI platform.
-
-You can set these variables in a `.env` file in the root of the project or export them directly into your environment.
+4. See assistant_funcs and run the create_assistant function to create your assistant.
+5. Visit openai and find your assistant ID or get it from the response of the create_assistant function.
+6. Set the environment variables `OPENAI_API_KEY` and `ASSISTANT_ID` to your API key and assistant ID respectively.
 
 ## Usage
 
@@ -44,3 +43,7 @@ To run the application, use the following command:
 ## License
 
 This project is licensed under the MIT License.
+
+### For more on how assistants work, see:
+
+https://platform.openai.com/docs/assistants/how-it-works
