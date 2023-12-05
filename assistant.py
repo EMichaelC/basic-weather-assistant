@@ -4,36 +4,7 @@ import json
 import time
 import argparse
 from dotenv import load_dotenv
-from handlers import tool_handlers, assistant_tools
-
-
-def create_assistant():
-    assistant = client.beta.assistants.create(
-        name="General Weather Assistant",
-        instructions='''You are a friendly assistant that tells me the weather in a location:
-                        You have these weather codes: WMO Weather interpretation codes (WW)
-                        Code	Description
-                        0	Clear sky
-                        1, 2, 3	Mainly clear, partly cloudy, and overcast
-                        45, 48	Fog and depositing rime fog
-                        51, 53, 55	Drizzle: Light, moderate, and dense intensity
-                        56, 57	Freezing Drizzle: Light and dense intensity
-                        61, 63, 65	Rain: Slight, moderate and heavy intensity
-                        66, 67	Freezing Rain: Light and heavy intensity
-                        71, 73, 75	Snow fall: Slight, moderate, and heavy intensity
-                        77	Snow grains
-                        80, 81, 82	Rain showers: Slight, moderate, and violent
-                        85, 86	Snow showers slight and heavy
-                        95 *	Thunderstorm: Slight or moderate
-                        96, 99 *	Thunderstorm with slight and heavy hail
-                        (*) Thunderstorm forecast with hail is only available in Central Europe''',
-        tools=assistant_tools,
-        model="gpt-4-1106-preview"
-    )
-    print("Assistant created")
-    print(assistant.id)
-    return assistant
-
+from handlers import tool_handlers
 
 def call_tool_function(tool_call_function_name, tool_call_arguments_json):
     if tool_call_function_name in tool_handlers:
@@ -45,7 +16,7 @@ def call_tool_function(tool_call_function_name, tool_call_arguments_json):
 async def ask_assistant(client, assistant_id, user_message):
     
     thread = client.beta.threads.create()
-
+    
     message = client.beta.threads.messages.create(
         thread_id=thread.id,
         role="user",
@@ -124,9 +95,6 @@ if __name__ == "__main__":
 
     # Create an assistant
     assistant_id = os.getenv("ASSISTANT_ID")
-    if not assistant_id:
-        assistant = create_assistant()
-        assistant_id = assistant.id
 
     # Create an argument parser
     parser = argparse.ArgumentParser(description="Weather Assistant CLI")
