@@ -6,7 +6,7 @@ import json
 import time
 from dotenv import load_dotenv
 from openai import OpenAI
-from weather_assistant import ask_assistant
+from assistant import ask_assistant
 
 # Load environment variables
 load_dotenv()

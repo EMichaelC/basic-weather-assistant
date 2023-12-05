@@ -4,12 +4,12 @@ import json
 import time
 import argparse
 from dotenv import load_dotenv
-from assistant_funcs import get_weather_by_location, get_daily_weather_by_location
+from handlers import tool_handlers, assistant_tools
 
 
 def create_assistant():
     assistant = client.beta.assistants.create(
-        name="Weather Assistant",
+        name="General Weather Assistant",
         instructions='''You are a friendly assistant that tells me the weather in a location:
                         You have these weather codes: WMO Weather interpretation codes (WW)
                         Code	Description
@@ -27,50 +27,20 @@ def create_assistant():
                         95 *	Thunderstorm: Slight or moderate
                         96, 99 *	Thunderstorm with slight and heavy hail
                         (*) Thunderstorm forecast with hail is only available in Central Europe''',
-        tools=[
-            # {
-            #     "type": "function",
-            #     "function": {
-            #         "name": "get_weather_by_location",
-            #         "description": "Get the weather in location based on latitude and longitude",
-            #         "parameters": {
-            #             "type": "object",
-            #             "properties": {
-            #                 "latitude": {"type": "string", "description": "The latitude of the location (e.g., 37.7749)"},
-            #                 "longitude": {"type": "string", "description": "The longitude of the location (e.g., -122.4194)"},
-            #             },
-            #         },
-            #         "required": ["latitude", "longitude"]
-                    
-            #     }
-            # },
-            {
-                "type": "function",
-                "function": {
-                    "name": "get_daily_weather_by_location",
-                    "description": "Get the daily weather in location based on latitude and longitude",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "latitude": {"type": "string", "description": "The latitude of the location (e.g., 37.7749)"},
-                            "longitude": {"type": "string", "description": "The longitude of the location (e.g., -122.4194)"},
-                            # "weather_variable": {
-                            #     "type": "array",
-                            #     "items": {
-                            #         "type": "string",
-                            #         "enum": ["weather_code", "temperature_2m_max", "temperature_2m_min"],
-                            #     },
-                            #     "description": "The weather variable to retrieve (e.g., temperature_2m_max)",
-                            # },
-                        },
-                    },
-                    "required": ["latitude", "longitude"]
-                }
-            }
-        ],
+        tools=assistant_tools,
         model="gpt-4-1106-preview"
     )
+    print("Assistant created")
+    print(assistant.id)
     return assistant
+
+
+def call_tool_function(tool_call_function_name, tool_call_arguments_json):
+    if tool_call_function_name in tool_handlers:
+        return tool_handlers[tool_call_function_name](tool_call_arguments_json)
+    else:
+        raise Exception(f"Unknown function name: {tool_call_function_name}")
+
 
 async def ask_assistant(client, assistant_id, user_message):
     
@@ -113,33 +83,20 @@ async def ask_assistant(client, assistant_id, user_message):
             tool_call_function_name = tool_call_function.name
 
             # Call the API
-            if tool_call_function_name == "get_daily_weather_by_location":
-                weather_data = get_daily_weather_by_location(
-                    latitude=tool_call_arguments_json["latitude"],
-                    longitude=tool_call_arguments_json["longitude"],
-                    # weather_variable=tool_call_arguments_json["weather_variable"]
-                )
-            elif tool_call_function_name == "get_weather_by_location":
-                weather_data = get_weather_by_location(
-                    latitude=tool_call_arguments_json["latitude"],
-                    longitude=tool_call_arguments_json["longitude"],
-                    weather_variable="temperature_2m"
-                )
-            else:
-                raise Exception("Unknown function name")
-
-            # convert the dataframe to a JSON string
-            weather_data_json = weather_data.to_json(orient="records")
-            # convert json to one string:
-            weather_data_json = "".join(weather_data_json.splitlines())
-              # Create a new message to the assistant with the weather data and ask for a concise summary
+            tool_call_arguments_json = json.loads(tool_call.function.arguments)
+            print(tool_call_function_name)
+            print(tool_call_arguments_json)
+            # Call the appropriate handler function
+            weather_data = call_tool_function(tool_call_function_name, tool_call_arguments_json)
+            print(weather_data)
+            # Create a new message to the assistant with the weather data and ask for a concise summary
             run = client.beta.threads.runs.submit_tool_outputs(
                     thread_id=thread.id,
                     run_id=run.id,
                     tool_outputs=[
                         {
                         "tool_call_id": tool_call.id,
-                        "output": weather_data_json + "\n\nPlease summarize the weather in one or two sentences."
+                        "output": weather_data + "\n\nPlease summarize the weather in one or two sentences."
                         }
                     ]
                 )

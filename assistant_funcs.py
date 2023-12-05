@@ -2,6 +2,9 @@ import openmeteo_requests
 import requests_cache
 import pandas as pd
 from retry_requests import retry
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse, parse_qs
 
 def get_weather_by_location(latitude, longitude, weather_variable="temperature_2m"):
     # Setup the Open-Meteo API client with cache and retry on error
@@ -36,8 +39,12 @@ def get_weather_by_location(latitude, longitude, weather_variable="temperature_2
         )
     }
     hourly_data[weather_variable] = hourly_data_values
-
-    return pd.DataFrame(data=hourly_data)
+    weather_data = pd.DataFrame(data=hourly_data)
+    # convert the dataframe to a JSON string
+    weather_data_json = weather_data.to_json(orient="records")
+    # convert json to one string:
+    weather_data_json_str = "".join(weather_data_json.splitlines())
+    return weather_data_json_str
 
 def get_daily_weather_by_location(latitude, longitude, weather_variable=["weather_code", "temperature_2m_max", "temperature_2m_min"]):
     # Setup the Open-Meteo API client with cache and retry on error
@@ -74,4 +81,40 @@ def get_daily_weather_by_location(latitude, longitude, weather_variable=["weathe
     daily_data["temperature_2m_max"] = daily_temperature_2m_max
     daily_data["temperature_2m_min"] = daily_temperature_2m_min
 
-    return pd.DataFrame(data = daily_data)
+    weather_data = pd.DataFrame(data = daily_data)
+    # convert the dataframe to a JSON string
+    weather_data_json = weather_data.to_json(orient = "records")
+    # convert json to one string:
+    weather_data_json_str = "".join(weather_data_json.splitlines())
+    return weather_data_json_str
+
+def get_text_from_first_google_search_result(query):
+    base_google_url = "https://www.google.com"
+    search_url = f"{base_google_url}/search?q={query}"
+
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    search_response = requests.get(search_url, headers=headers)
+
+    if search_response.status_code != 200:
+        return "Failed to retrieve search results"
+
+    soup = BeautifulSoup(search_response.text, 'html.parser')
+
+    # Find the first search result URL
+    for a_tag in soup.find_all('a', href=True):
+        href = a_tag['href']
+        # Check if the href contains a URL and extract it
+        if '/url?q=' in href:
+            # Parse the query string to extract the actual URL
+            url_parts = urlparse(href)
+            query_string = parse_qs(url_parts.query)
+            actual_url = query_string.get('q', [None])[0]
+            if actual_url:
+                # Fetch the content from the actual URL
+                page_response = requests.get(actual_url, headers=headers)
+                if page_response.status_code == 200:
+                    page_soup = BeautifulSoup(page_response.text, 'html.parser')
+                    return page_soup.get_text(separator='\n')
+                break
+
+    return "Failed to extract URL or retrieve data"
