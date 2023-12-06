@@ -4,7 +4,7 @@ import pandas as pd
 from retry_requests import retry
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs
 
 def get_weather_by_location(latitude, longitude, weather_variable="temperature_2m"):
     # Setup the Open-Meteo API client with cache and retry on error
@@ -47,6 +47,9 @@ def get_weather_by_location(latitude, longitude, weather_variable="temperature_2
     return weather_data_json_str
 
 def get_daily_weather_by_location(latitude, longitude, weather_variable=["weather_code", "temperature_2m_max", "temperature_2m_min"]):
+    '''
+        
+    '''
     # Setup the Open-Meteo API client with cache and retry on error
     cache_session = requests_cache.CachedSession('.cache', expire_after = 3600)
     retry_session = retry(cache_session, retries = 5, backoff_factor = 0.2)
@@ -88,7 +91,10 @@ def get_daily_weather_by_location(latitude, longitude, weather_variable=["weathe
     weather_data_json_str = "".join(weather_data_json.splitlines())
     return weather_data_json_str
 
-def get_text_from_first_google_search_result(query):
+def get_text_from_first_google_search_result(query: str):
+    '''
+    Assistant tool function to get the text from the first Google search result
+    '''
     base_google_url = "https://www.google.com"
     search_url = f"{base_google_url}/search?q={query}"
 
