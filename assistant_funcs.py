@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 
 def get_weather_by_location(latitude, longitude, weather_variable="temperature_2m"):
-    # Setup the Open-Meteo API client with cache and retry on error
+    # Setup the Open-Meteo API client with cache and retry on error.
     cache_session = requests_cache.CachedSession('.cache', expire_after=3600)
     retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
     openmeteo = openmeteo_requests.Client(session=retry_session)
